@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# 0. Root path of Cassiopee: derive it from the script location
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [ -d "$SCRIPT_DIR/Cassiopee" ]; then
+  CASSIOPEE_ROOT="$SCRIPT_DIR/Cassiopee"
+else
+  CASSIOPEE_ROOT="$SCRIPT_DIR"
+fi
+
+cd "$CASSIOPEE_ROOT"
+
+# 1. Activate Conda environment (grifo)
+if [ -z "$CONDA_PREFIX" ] || [ "$CONDA_PREFIX" != "/home/cfse2/miniconda3/envs/grifo" ]; then
+  echo ">>> Activating conda environment: grifo"
+  source /home/cfse2/miniconda3/bin/activate grifo
+fi
+
+export CONDA_LIB_PATH=$CONDA_PREFIX/lib
+export LD_LIBRARY_PATH=$CONDA_LIB_PATH:$LD_LIBRARY_PATH
+export LIBRARY_PATH=$CONDA_LIB_PATH:$LIBRARY_PATH
+export CPATH=$CONDA_PREFIX/include:$CPATH
+export PATH=$CONDA_PREFIX/bin:$PATH
+export ELSAPROD=x86_r8
+export PYTHONPATH="$CONDA_PREFIX/Dist/bin/$ELSAPROD/lib/python3.9/site-packages:$CASSIOPEE_ROOT/Dist/bin/$ELSAPROD/lib/python3.9/site-packages:$CASSIOPEE_ROOT/KCore:$PYTHONPATH"
+export CASSIOPEE=$CASSIOPEE_ROOT                                                 
+
+# 2. OVERWRITE installBase.py
+# This deletes the old file and writes a new one that ONLY uses Conda.
+# We force the system name to 'x86_r8' to avoid the directory confusion.
+echo ">>> Overwriting KCore/installBase.py..."
+cat > KCore/installBase.py <<EOF
+import os
+
+# Forced Conda Configuration
+conda_config = [
+    '$ELSAPROD',                                 # 0. System Name
+    'mpif90',                                 # 1. F77
+    'mpif90',                                 # 2. F90
+    'g++',                                    # 3. C++
+    ['-fPIC', '-O3', '-DNDEBUG', '-std=c++11'], # 4. C++ Flags
+    ['-fPIC', '-O3'],                         # 5. Fortran Flags
+    True,                                     # 6. OpenMP
+    False,                                    # 7. Static
+    ['$CONDA_PREFIX/include'],                # 8. Includes
+    ['gfortran', 'gomp', 'pthread', 'mpi'],   # 9. Libs
+    ['$CONDA_PREFIX/lib'],                    # 10. Lib Paths
+    False,                                    # 11. CUDA
+    []                                        # 12. NVCC
+]
+
+installDict = {
+    None: conda_config,
+    '$ELSAPROD': conda_config,
+    'default': conda_config
+}
+EOF
+
+clean_and_install () {
+    local module_dir="$1"
+    echo ">>> Cleaning $module_dir..."
+    rm -rf "${module_dir}/build" "${module_dir}/Dist" "${module_dir}"/*.egg-info
+    echo ">>> Building $module_dir..."
+    (cd "$module_dir" && ./install)
+}
+
+# 3. Clean + build each module, always starting from a blank slate
+clean_and_install KCore
+clean_and_install Converter
+clean_and_install Connector
+clean_and_install Transform
+
+echo "SUCCESS"

@@ -52,6 +52,7 @@ Copyright (c) 2012 Brandon Pelfrey
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <cstdlib>
 
 #ifndef XA_DEBUG
 #ifdef NDEBUG

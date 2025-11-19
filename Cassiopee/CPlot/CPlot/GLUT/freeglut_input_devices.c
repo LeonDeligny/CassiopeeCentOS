@@ -45,7 +45,9 @@
 #include <string.h>
 #include <termios.h>
 #include <fcntl.h>
-
+#ifdef __unix__
+#include <unistd.h>
+#endif
 typedef struct {
    int fd;
    struct termios termio, termio_save;

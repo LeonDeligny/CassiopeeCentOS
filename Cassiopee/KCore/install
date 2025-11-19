@@ -32,7 +32,7 @@ fi
 
 # if specific python exe name
 if [ "$PYTHONEXE" != "" ]; then
-    alias python=$PYTHONEXE
+    alias python=${PYTHONEXE:-python3}
 fi
 
 # set production mode (0: scons+setup, 1: scons+pip, 2: scons+pip+wheel)
