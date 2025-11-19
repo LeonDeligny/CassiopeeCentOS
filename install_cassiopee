@@ -22,7 +22,8 @@ export LIBRARY_PATH=$CONDA_LIB_PATH:$LIBRARY_PATH
 export CPATH=$CONDA_PREFIX/include:$CPATH
 export PATH=$CONDA_PREFIX/bin:$PATH
 export ELSAPROD=x86_r8
-export PYTHONPATH="$CONDA_PREFIX/Dist/bin/$ELSAPROD/lib/python3.9/site-packages:$CASSIOPEE_ROOT/Dist/bin/$ELSAPROD/lib/python3.9/site-packages:$CASSIOPEE_ROOT/KCore:$PYTHONPATH"
+export INSTALL_PREFIX="$CONDA_PREFIX"
+export PYTHONPATH="$INSTALL_PREFIX/lib/python3.9/site-packages:$CASSIOPEE_ROOT/Dist/bin/$ELSAPROD/lib/python3.9/site-packages:$CASSIOPEE_ROOT/KCore:$PYTHONPATH"
 export CASSIOPEE=$CASSIOPEE_ROOT                                                 
 
 # 2. OVERWRITE installBase.py
@@ -61,7 +62,7 @@ clean_and_install () {
     echo ">>> Cleaning $module_dir..."
     rm -rf "${module_dir}/build" "${module_dir}/Dist" "${module_dir}"/*.egg-info
     echo ">>> Building $module_dir..."
-    (cd "$module_dir" && ./install)
+    (cd "$module_dir" && ./install "$INSTALL_PREFIX")
 }
 
 # 3. Clean + build each module, always starting from a blank slate
@@ -69,5 +70,34 @@ clean_and_install KCore
 clean_and_install Converter
 clean_and_install Connector
 clean_and_install Transform
+
+echo ">>> Verifying module import paths from grifo environment..."
+python <<'EOF'
+import os
+import sys
+import importlib
+
+modules = ["Transform", "Connector", "Converter", "KCore"]
+install_prefix = os.environ.get("INSTALL_PREFIX", "")
+expected = os.path.join(install_prefix, "lib", "python3.9", "site-packages")
+
+errors = []
+for mod in modules:
+    try:
+        module = importlib.import_module(mod)
+    except Exception as err:
+        errors.append(f"{mod}: import failed ({err})")
+        continue
+    location = getattr(module, "__file__", "")
+    if not location.startswith(expected):
+        errors.append(f"{mod}: loaded from {location}, expected under {expected}")
+
+if errors:
+    for err in errors:
+        print(f"[ERROR] {err}")
+    sys.exit(1)
+else:
+    print(f"All modules imported from {expected}")
+EOF
 
 echo "SUCCESS"
